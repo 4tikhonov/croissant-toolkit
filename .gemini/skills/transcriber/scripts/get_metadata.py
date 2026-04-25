@@ -152,7 +152,7 @@ def fetch_metadata(video_id, session=None, transcript_text=None):
                 {
                     "@type": "DataDownload",
                     "name": "transcript",
-                    "contentUrl": f"data/transcripts/{video_id}.txt",
+                    "contentUrl": f"file://{os.path.abspath(os.path.join('data/transcripts', f'{video_id}.txt'))}",
                     "encodingFormat": "text/plain"
                 }
             ]
