@@ -59,10 +59,13 @@ def transcribe_video(video_id, output_dir, target_url, cookies_path=None):
         unf_hash = None
         try:
             # Dynamically resolve the relative path of this script from the project root
-            # Assuming project root is 5 levels up: /.gemini/skills/transcriber/scripts/transcribe.py
             script_path_abs = os.path.abspath(__file__)
             root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_path_abs)))))
             script_rel_path = os.path.relpath(script_path_abs, root_dir)
+            
+            # Ensure it starts with .gemini (match manual test exactly)
+            if not script_rel_path.startswith("."):
+                script_rel_path = f"{script_rel_path}"
             
             # Construct the command string requested for the UNF signature
             command_string = f"{script_rel_path} {target_url}"
@@ -75,10 +78,13 @@ def transcribe_video(video_id, output_dir, target_url, cookies_path=None):
                 unf_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(unf_module)
                 
-                print(f"Computing UNF signature for: {command_string}")
+                print(f"Signature String: {command_string}")
                 unf_hash = unf_module.compute_unf_string(command_string)
                 if unf_hash:
-                    print(f"Command Signature (UNF): {unf_hash}")
+                    # Clean up prefix for metadata consistency
+                    if unf_hash.startswith("UNF:6:"):
+                        unf_hash = unf_hash.replace("UNF:6:", "UNF6:")
+                    print(f"Command Signature: {unf_hash}")
         except Exception as unf_err:
             print(f"Warning: Command fingerprinting failed: {unf_err}")
 
