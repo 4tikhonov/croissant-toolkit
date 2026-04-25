@@ -57,12 +57,17 @@ def main():
             os.makedirs(output_dir, exist_ok=True)
             
             count = 0
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            metadata_script = os.path.join(script_dir, "get_metadata.py")
+            
             for item in results:
                 vid = item.get('id')
                 if vid and transcribe_video(vid, output_dir):
                     count += 1
+                    if os.path.exists(metadata_script):
+                        subprocess.run([sys.executable, metadata_script, vid])
             
-            print(f"\nBatch process complete. {count} transcripts collected.")
+            print(f"\nBatch process complete. {count} transcripts and metadata collected.")
             return
 
         print("Usage: python3 transcribe.py <VIDEO_ID_OR_URL>")
@@ -78,7 +83,14 @@ def main():
     output_dir = "data/transcripts"
     os.makedirs(output_dir, exist_ok=True)
     
-    transcribe_video(video_id, output_dir)
+    if transcribe_video(video_id, output_dir):
+        # Extend: Fetch metadata automatically
+        print("\nFetching metadata...")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        metadata_script = os.path.join(script_dir, "get_metadata.py")
+        if os.path.exists(metadata_script):
+            subprocess.run([sys.executable, metadata_script, video_id])
 
 if __name__ == "__main__":
+    import subprocess
     main()

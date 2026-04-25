@@ -23,5 +23,16 @@ python3 transcriber/scripts/transcribe.py <VIDEO_URL_OR_ID>
 python3 transcriber/scripts/transcribe.py
 ```
 
+### 2. Fetch Video Metadata
+Extracts high-fidelity metadata (Title, Description, Views, Upload Date) in Schema.org JSON-LD format.
+
+**Usage:**
+```bash
+python3 transcriber/scripts/get_metadata.py <VIDEO_URL_OR_ID>
+```
+
+**Output:**
+Metadata is saved to `./data/metadata/<VIDEO_ID>.json`.
+
 **Example:**
 `python3 transcriber/scripts/transcribe.py https://www.youtube.com/watch?v=6cWcZ2G53gE`
