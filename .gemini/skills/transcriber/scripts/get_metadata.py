@@ -115,15 +115,46 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
 
         # Views
         views = schema_data.get('interactionCount')
-        if not views and initial_data:
+        likes = "0"
+        subscribers = "0"
+        if initial_data:
             try:
-                contents = initial_data['contents']['twoColumnWatchNextResults']['results']['results']['contents']
-                for c in contents:
+                results = initial_data['contents']['twoColumnWatchNextResults']['results']['results']['contents']
+                for c in results:
+                    # Views and Likes
                     if 'videoPrimaryInfoRenderer' in c:
-                        views_text = c['videoPrimaryInfoRenderer']['viewCount']['videoViewCountRenderer']['viewCount']['simpleText']
-                        views = re.sub(r'[^\d]', '', views_text)
+                        primary = c['videoPrimaryInfoRenderer']
+                        # Views fallback
+                        if not views:
+                            v_renderer = primary.get('viewCount', {}).get('videoViewCountRenderer', {})
+                            v_text = v_renderer.get('viewCount', {}).get('simpleText') or v_renderer.get('shortViewCount', {}).get('simpleText')
+                            if v_text: views = re.sub(r'[^\d]', '', v_text)
+                        
+                        # Likes
+                        try:
+                            buttons = primary.get('videoActions', {}).get('menuRenderer', {}).get('topLevelButtons', [])
+                            for b in buttons:
+                                if 'segmentedLikeButtonRenderer' in b:
+                                    likes_text = b['segmentedLikeButtonRenderer'].get('likeButton', {}).get('likeButtonRenderer', {}).get('likeCountText', {}).get('simpleText')
+                                    if likes_text: likes = re.sub(r'[^\d]', '', likes_text)
+                                    break
+                                elif 'toggleButtonRenderer' in b and 'LIKE' in str(b):
+                                    likes_text = b['toggleButtonRenderer'].get('defaultText', {}).get('simpleText')
+                                    if likes_text: likes = re.sub(r'[^\d]', '', likes_text)
+                        except: pass
+
+                    # Subscribers
+                    if 'videoSecondaryInfoRenderer' in c:
+                        try:
+                            owner = c['videoSecondaryInfoRenderer'].get('owner', {}).get('videoOwnerRenderer', {})
+                            sub_text = owner.get('subscriberCountText', {}).get('simpleText')
+                            if sub_text: subscribers = sub_text
+                        except: pass
             except:
                 pass
+
+        # Use schema_data comment count if available, otherwise "0"
+        comment_count = schema_data.get('commentCount') or "0"
 
         # Upload Date
         upload_date = schema_data.get('uploadDate')
@@ -139,6 +170,8 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
             "@type": "VideoObject",
             "name": title or "Unknown Title",
             "description": description or "",
+            "likes": likes,
+            "subscriberCount": subscribers,
             "url": url,
             "transcript": transcript_text or "",
             "contentSignature": unf_hash,
@@ -196,6 +229,18 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
                             "dataType": "sc:Date",
                             "source_file": "metadata",
                             "extract_column": "datePublished"
+                        },
+                        {
+                            "name": "likes",
+                            "dataType": "sc:Integer",
+                            "source_file": "metadata",
+                            "extract_column": "likes"
+                        },
+                        {
+                            "name": "subscribers",
+                            "dataType": "sc:Text",
+                            "source_file": "metadata",
+                            "extract_column": "subscriberCount"
                         },
                         {
                             "name": "fingerprint",
