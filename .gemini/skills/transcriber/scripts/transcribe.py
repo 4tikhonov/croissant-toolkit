@@ -59,8 +59,8 @@ def transcribe_video(video_id, output_dir, cookies_path=None):
         # This keeps the authenticated context alive
         try:
             from get_metadata import fetch_metadata
-            print("Fetching metadata with shared session...")
-            metadata = fetch_metadata(video_id, session=session)
+            print("Fetching metadata with shared session and transcript...")
+            metadata = fetch_metadata(video_id, session=session, transcript_text=full_text)
             if metadata:
                 meta_dir = "data/metadata"
                 os.makedirs(meta_dir, exist_ok=True)

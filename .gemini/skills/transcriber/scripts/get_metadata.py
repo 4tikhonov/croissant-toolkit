@@ -12,7 +12,7 @@ def get_video_id(url_or_id):
     if len(url_or_id) == 11: return url_or_id
     return None
 
-def fetch_metadata(video_id, session=None):
+def fetch_metadata(video_id, session=None, transcript_text=None):
     from requests import Session
     url = f"https://www.youtube.com/watch?v={video_id}"
     
@@ -130,6 +130,7 @@ def fetch_metadata(video_id, session=None):
             "name": title or "Unknown Title",
             "description": description or "",
             "url": url,
+            "transcript": transcript_text or "",
             "author": {
                 "@type": "Person",
                 "name": author_name or "Unknown Channel",
@@ -146,7 +147,15 @@ def fetch_metadata(video_id, session=None):
             "interactionCount": views or "0",
             "commentCount": schema_data.get('commentCount') or "0",
             "identifier": video_id,
-            "uploadDate": schema_data.get('uploadDate')
+            "uploadDate": schema_data.get('uploadDate'),
+            "distribution": [
+                {
+                    "@type": "DataDownload",
+                    "name": "transcript",
+                    "contentUrl": f"data/transcripts/{video_id}.txt",
+                    "encodingFormat": "text/plain"
+                }
+            ]
         }
         
         return metadata
