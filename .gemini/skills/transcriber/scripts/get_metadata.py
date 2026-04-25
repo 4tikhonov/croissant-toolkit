@@ -12,7 +12,7 @@ def get_video_id(url_or_id):
     if len(url_or_id) == 11: return url_or_id
     return None
 
-def fetch_metadata(video_id, session=None, transcript_text=None):
+def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
     from requests import Session
     url = f"https://www.youtube.com/watch?v={video_id}"
     
@@ -141,6 +141,7 @@ def fetch_metadata(video_id, session=None, transcript_text=None):
             "description": description or "",
             "url": url,
             "transcript": transcript_text or "",
+            "contentSignature": unf_hash,
             "author": {
                 "@type": "Person",
                 "name": author_name or "Unknown Channel",

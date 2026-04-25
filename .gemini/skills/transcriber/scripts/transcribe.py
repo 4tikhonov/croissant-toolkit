@@ -54,13 +54,30 @@ def transcribe_video(video_id, output_dir, cookies_path=None):
             f.write(full_text)
             
         print(f"Successfully saved transcript to {output_path}")
-        
+
+        # --- Fingerprinting with UNF Expert ---
+        unf_hash = None
+        try:
+            # Dynamically locate the UNF skill
+            unf_script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "unf", "scripts", "unf_hash.py")
+            if os.path.exists(unf_script_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("unf_hash", unf_script_path)
+                unf_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(unf_module)
+                
+                print(f"Computing UNF fingerprint for {video_id}...")
+                unf_hash = unf_module.compute_unf_file(output_path)
+                if unf_hash:
+                    print(f"UNF Signature: {unf_hash}")
+        except Exception as unf_err:
+            print(f"Warning: UNF Fingerprinting failed: {unf_err}")
+
         # Use the SAME session to fetch metadata immediately
-        # This keeps the authenticated context alive
         try:
             from get_metadata import fetch_metadata
             print("Fetching metadata with shared session and transcript...")
-            metadata = fetch_metadata(video_id, session=session, transcript_text=full_text)
+            metadata = fetch_metadata(video_id, session=session, transcript_text=full_text, unf_hash=unf_hash)
             if metadata:
                 meta_dir = "data/metadata"
                 os.makedirs(meta_dir, exist_ok=True)
@@ -69,7 +86,6 @@ def transcribe_video(video_id, output_dir, cookies_path=None):
                     json.dump(metadata, f, indent=4, ensure_ascii=False)
                 print(f"Successfully saved metadata to {meta_path}")
         except ImportError:
-            # Fallback if import fails (e.g. running outside the scripts dir)
             pass
             
         return True
