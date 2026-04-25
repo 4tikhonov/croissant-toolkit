@@ -81,10 +81,13 @@ def create_croissant_jsonld(metadata):
         "url": metadata.get("url", "https://example.com/dataset"),
         "license": metadata.get("license", "CC-BY-4.0"),
         "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
+        "datePublished": metadata.get("datePublished") or metadata.get("uploadDate"),
+        "version": metadata.get("version", "1.0"),
         "distribution": distribution_list,
         "recordSet": record_set_list,
         "creator": creator_list,
         "publisher": publisher_list,
+        "author": metadata.get("author"),
         "spatialCoverage": spatial_list,
         "temporalCoverage": temporal_list,
         "keywords": keywords_list

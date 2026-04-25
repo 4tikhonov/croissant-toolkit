@@ -135,30 +135,21 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
                 upload_date = player_response.get('microformat', {}).get('playerMicroformatRenderer', {}).get('publishDate')
 
         metadata = {
-            "@context": "https://schema.org",
+            "@context": "https://schema.org/",
             "@type": "VideoObject",
             "name": title or "Unknown Title",
             "description": description or "",
             "url": url,
             "transcript": transcript_text or "",
             "contentSignature": unf_hash,
-            "author": {
-                "@type": "Person",
-                "name": author_name or "Unknown Channel",
-                "url": f"https://www.youtube.com/channel/{channel_id}" if channel_id else None
-            },
-            "publisher": {
-                "@type": "Organization",
-                "name": author_name or "YouTube",
-                "logo": {
-                    "@type": "ImageObject",
-                    "url": "https://www.youtube.com/img/desktop/yt_1200.png"
-                }
-            },
-            "interactionCount": views or "0",
-            "commentCount": schema_data.get('commentCount') or "0",
-            "identifier": video_id,
+            "author": [{"@type": "Person", "name": author_name}] if author_name else [],
+            "creator": [{"@type": "Organization", "name": channel_title}] if channel_title else [],
+            "publisher": [{"@type": "Organization", "name": "YouTube"}],
             "uploadDate": upload_date,
+            "datePublished": upload_date,
+            "interactionCount": views or "0",
+            "commentCount": comment_count,
+            "identifier": video_id,
             "distribution": [
                 {
                     "type": "FileObject",
