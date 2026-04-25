@@ -113,6 +113,7 @@ def fetch_metadata(video_id, session=None, transcript_text=None):
             except:
                 pass
 
+        # Views
         views = schema_data.get('interactionCount')
         if not views and initial_data:
             try:
@@ -123,6 +124,15 @@ def fetch_metadata(video_id, session=None, transcript_text=None):
                         views = re.sub(r'[^\d]', '', views_text)
             except:
                 pass
+
+        # Upload Date
+        upload_date = schema_data.get('uploadDate')
+        if not upload_date and player_response:
+            # Check player microformat first
+            upload_date = player_response.get('microformat', {}).get('playerMicroformatRenderer', {}).get('uploadDate')
+            if not upload_date:
+                # Fallback to publishDate
+                upload_date = player_response.get('microformat', {}).get('playerMicroformatRenderer', {}).get('publishDate')
 
         metadata = {
             "@context": "https://schema.org",
@@ -147,7 +157,7 @@ def fetch_metadata(video_id, session=None, transcript_text=None):
             "interactionCount": views or "0",
             "commentCount": schema_data.get('commentCount') or "0",
             "identifier": video_id,
-            "uploadDate": schema_data.get('uploadDate'),
+            "uploadDate": upload_date,
             "distribution": [
                 {
                     "@type": "DataDownload",
