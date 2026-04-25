@@ -161,10 +161,23 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
             "uploadDate": upload_date,
             "distribution": [
                 {
-                    "@type": "DataDownload",
+                    "type": "FileObject",
                     "name": "transcript",
                     "contentUrl": f"file://{os.path.abspath(os.path.join('data/transcripts', f'{video_id}.txt'))}",
                     "encodingFormat": "text/plain"
+                }
+            ],
+            "recordSet": [
+                {
+                    "name": "transcripts",
+                    "field": [
+                        {
+                            "name": "content",
+                            "dataType": "sc:Text",
+                            "source_file": "transcript",
+                            "extract_column": "content"
+                        }
+                    ]
                 }
             ]
         }

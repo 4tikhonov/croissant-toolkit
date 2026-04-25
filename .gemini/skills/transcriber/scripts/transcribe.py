@@ -100,6 +100,27 @@ def transcribe_video(video_id, output_dir, target_url, cookies_path=None):
                 with open(meta_path, 'w', encoding='utf-8') as f:
                     json.dump(metadata, f, indent=4, ensure_ascii=False)
                 print(f"Successfully saved metadata to {meta_path}")
+
+                # --- Croissant Serialization ---
+                try:
+                    croissant_script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "croissant_expert", "scripts", "serialize.py")
+                    if os.path.exists(croissant_script_path):
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location("serialize", croissant_script_path)
+                        croissant_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(croissant_module)
+                        
+                        print(f"Generating Croissant JSON-LD for {video_id}...")
+                        croissant_data = croissant_module.create_croissant_jsonld(metadata)
+                        
+                        croissant_dir = "data/croissant"
+                        os.makedirs(croissant_dir, exist_ok=True)
+                        croissant_path = os.path.join(croissant_dir, f"{video_id}-croissant.json")
+                        with open(croissant_path, 'w', encoding='utf-8') as f:
+                            json.dump(croissant_data, f, indent=4, ensure_ascii=False)
+                        print(f"Successfully saved Croissant metadata to {croissant_path}")
+                except Exception as croissant_err:
+                    print(f"Warning: Croissant serialization failed: {croissant_err}")
         except ImportError:
             pass
             
