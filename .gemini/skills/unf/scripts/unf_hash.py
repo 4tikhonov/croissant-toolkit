@@ -20,8 +20,9 @@ except ImportError as e:
     sys.exit(1)
 
 def compute_unf_string(input_string):
-    """Compute UNF for a single atomic string vector."""
-    series = pl.Series([input_string])
+    """Compute UNF for a single string vector (split and sorted)."""
+    words = sorted(input_string.split())
+    series = pl.Series(words)
     return unf_column(series)
 
 def compute_unf_file(file_path, json_report=False):
