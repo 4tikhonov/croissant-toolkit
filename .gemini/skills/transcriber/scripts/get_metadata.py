@@ -143,7 +143,7 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
             "transcript": transcript_text or "",
             "contentSignature": unf_hash,
             "author": [{"@type": "Person", "name": author_name}] if author_name else [],
-            "creator": [{"@type": "Organization", "name": channel_title}] if channel_title else [],
+            "creator": [{"@type": "Organization", "name": author_name}] if author_name else [],
             "publisher": [{"@type": "Organization", "name": "YouTube"}],
             "uploadDate": upload_date,
             "datePublished": upload_date,
