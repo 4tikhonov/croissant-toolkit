@@ -175,6 +175,35 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
                             "extract_column": "content"
                         }
                     ]
+                },
+                {
+                    "name": "metadata",
+                    "field": [
+                        {
+                            "name": "views",
+                            "dataType": "sc:Integer",
+                            "source_file": "metadata",
+                            "extract_column": "interactionCount"
+                        },
+                        {
+                            "name": "comments",
+                            "dataType": "sc:Integer",
+                            "source_file": "metadata",
+                            "extract_column": "commentCount"
+                        },
+                        {
+                            "name": "published",
+                            "dataType": "sc:Date",
+                            "source_file": "metadata",
+                            "extract_column": "datePublished"
+                        },
+                        {
+                            "name": "fingerprint",
+                            "dataType": "sc:Text",
+                            "source_file": "metadata",
+                            "extract_column": "contentSignature"
+                        }
+                    ]
                 }
             ]
         }
