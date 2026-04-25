@@ -12,17 +12,23 @@ def get_video_id(url_or_id):
     if len(url_or_id) == 11: return url_or_id
     return None
 
-def fetch_metadata(video_id):
+def fetch_metadata(video_id, session=None):
+    from requests import Session
     url = f"https://www.youtube.com/watch?v={video_id}"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-    }
     
-    req = urllib.request.Request(url, headers=headers)
+    # If no session provided, create a basic one with headers
+    if session is None:
+        session = Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.youtube.com/'
+        })
+    
     try:
-        with urllib.request.urlopen(req) as response:
-            html = response.read().decode('utf-8')
+        response = session.get(url)
+        response.raise_for_status()
+        html = response.text
             
         # 1. Extract JSON-LD (Schema.org)
         json_ld_match = re.search(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
