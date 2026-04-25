@@ -148,7 +148,7 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
             "uploadDate": upload_date,
             "datePublished": upload_date,
             "interactionCount": views or "0",
-            "commentCount": comment_count,
+            "commentCount": schema_data.get('commentCount') or "0",
             "identifier": video_id,
             "distribution": [
                 {
