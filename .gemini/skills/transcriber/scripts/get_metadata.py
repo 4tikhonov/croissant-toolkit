@@ -165,6 +165,12 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
                     "name": "transcript",
                     "contentUrl": f"file://{os.path.abspath(os.path.join('data/transcripts', f'{video_id}.txt'))}",
                     "encodingFormat": "text/plain"
+                },
+                {
+                    "type": "FileObject",
+                    "name": "metadata",
+                    "contentUrl": f"file://{os.path.abspath(os.path.join('data/metadata', f'{video_id}.json'))}",
+                    "encodingFormat": "application/ld+json"
                 }
             ],
             "recordSet": [
