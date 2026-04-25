@@ -158,3 +158,6 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     
     transcribe_video(video_id, output_dir, url, cookies)
+
+if __name__ == "__main__":
+    main()
