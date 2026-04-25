@@ -113,48 +113,63 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
             except:
                 pass
 
+        def find_key(obj, key):
+            """Recursively find a key in a nested dictionary/list."""
+            if isinstance(obj, dict):
+                if key in obj:
+                    return obj[key]
+                for k, v in obj.items():
+                    res = find_key(v, key)
+                    if res is not None:
+                        return res
+            elif isinstance(obj, list):
+                for item in obj:
+                    res = find_key(item, key)
+                    if res is not None:
+                        return res
+            return None
+
         # Views
         views = schema_data.get('interactionCount')
+        if not views and initial_data:
+            v_data = find_key(initial_data, 'viewCount')
+            if isinstance(v_data, dict):
+                v_text = v_data.get('videoViewCountRenderer', {}).get('viewCount', {}).get('simpleText')
+                if v_text: views = re.sub(r'[^\d]', '', v_text)
+
+        # Likes extraction
         likes = "0"
+        if initial_data:
+            l_data = find_key(initial_data, 'segmentedLikeButtonRenderer')
+            if l_data:
+                likes_text = l_data.get('likeButton', {}).get('likeButtonRenderer', {}).get('likeCountText', {}).get('simpleText')
+                if likes_text: likes = re.sub(r'[^\d]', '', likes_text)
+            
+            if likes == "0":
+                # Fallback search for any likeCountText
+                l_text = find_key(initial_data, 'likeCountText')
+                if isinstance(l_text, dict): l_text = l_text.get('simpleText')
+                if l_text: likes = re.sub(r'[^\d]', '', str(l_text))
+
+        # Subscribers extraction
         subscribers = "0"
         if initial_data:
-            try:
-                results = initial_data['contents']['twoColumnWatchNextResults']['results']['results']['contents']
-                for c in results:
-                    # Views and Likes
-                    if 'videoPrimaryInfoRenderer' in c:
-                        primary = c['videoPrimaryInfoRenderer']
-                        # Views fallback
-                        if not views:
-                            v_renderer = primary.get('viewCount', {}).get('videoViewCountRenderer', {})
-                            v_text = v_renderer.get('viewCount', {}).get('simpleText') or v_renderer.get('shortViewCount', {}).get('simpleText')
-                            if v_text: views = re.sub(r'[^\d]', '', v_text)
-                        
-                        # Likes
-                        try:
-                            buttons = primary.get('videoActions', {}).get('menuRenderer', {}).get('topLevelButtons', [])
-                            for b in buttons:
-                                if 'segmentedLikeButtonRenderer' in b:
-                                    likes_text = b['segmentedLikeButtonRenderer'].get('likeButton', {}).get('likeButtonRenderer', {}).get('likeCountText', {}).get('simpleText')
-                                    if likes_text: likes = re.sub(r'[^\d]', '', likes_text)
-                                    break
-                                elif 'toggleButtonRenderer' in b and 'LIKE' in str(b):
-                                    likes_text = b['toggleButtonRenderer'].get('defaultText', {}).get('simpleText')
-                                    if likes_text: likes = re.sub(r'[^\d]', '', likes_text)
-                        except: pass
+            s_data = find_key(initial_data, 'subscriberCountText')
+            if isinstance(s_data, dict):
+                s_text = s_data.get('simpleText')
+                if s_text: subscribers = s_text
+            elif isinstance(s_data, str):
+                subscribers = s_data
 
-                    # Subscribers
-                    if 'videoSecondaryInfoRenderer' in c:
-                        try:
-                            owner = c['videoSecondaryInfoRenderer'].get('owner', {}).get('videoOwnerRenderer', {})
-                            sub_text = owner.get('subscriberCountText', {}).get('simpleText')
-                            if sub_text: subscribers = sub_text
-                        except: pass
-            except:
-                pass
-
-        # Use schema_data comment count if available, otherwise "0"
+        # Comments extraction
         comment_count = schema_data.get('commentCount') or "0"
+        if (comment_count == "0" or not comment_count) and initial_data:
+            c_data = find_key(initial_data, 'commentCountText')
+            if isinstance(c_data, dict):
+                c_text = c_data.get('simpleText')
+                if c_text: comment_count = re.sub(r'[^\d]', '', c_text)
+            elif isinstance(c_data, str):
+                comment_count = re.sub(r'[^\d]', '', c_data)
 
         # Upload Date
         upload_date = schema_data.get('uploadDate')
