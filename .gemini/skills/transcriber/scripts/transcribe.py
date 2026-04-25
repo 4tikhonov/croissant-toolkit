@@ -15,7 +15,7 @@ def get_video_id(url_or_id):
         return url_or_id
     return None
 
-def transcribe_video(video_id, output_dir, cookies_path=None):
+def transcribe_video(video_id, output_dir, target_url, cookies_path=None):
     from requests import Session
     import http.cookiejar
 
@@ -55,23 +55,32 @@ def transcribe_video(video_id, output_dir, cookies_path=None):
             
         print(f"Successfully saved transcript to {output_path}")
 
-        # --- Fingerprinting with UNF Expert ---
+        # --- Fingerprinting the Command Invocation (Provenance) ---
         unf_hash = None
         try:
+            # Dynamically resolve the relative path of this script from the project root
+            # Assuming project root is 5 levels up: /.gemini/skills/transcriber/scripts/transcribe.py
+            script_path_abs = os.path.abspath(__file__)
+            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_path_abs)))))
+            script_rel_path = os.path.relpath(script_path_abs, root_dir)
+            
+            # Construct the command string requested for the UNF signature
+            command_string = f"{script_rel_path} {target_url}"
+            
             # Dynamically locate the UNF skill
-            unf_script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "unf", "scripts", "unf_hash.py")
+            unf_script_path = os.path.join(root_dir, ".gemini", "skills", "unf", "scripts", "unf_hash.py")
             if os.path.exists(unf_script_path):
                 import importlib.util
                 spec = importlib.util.spec_from_file_location("unf_hash", unf_script_path)
                 unf_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(unf_module)
                 
-                print(f"Computing UNF fingerprint for {video_id}...")
-                unf_hash = unf_module.compute_unf_file(output_path)
+                print(f"Computing UNF signature for: {command_string}")
+                unf_hash = unf_module.compute_unf_string(command_string)
                 if unf_hash:
-                    print(f"UNF Signature: {unf_hash}")
+                    print(f"Command Signature (UNF): {unf_hash}")
         except Exception as unf_err:
-            print(f"Warning: UNF Fingerprinting failed: {unf_err}")
+            print(f"Warning: Command fingerprinting failed: {unf_err}")
 
         # Use the SAME session to fetch metadata immediately
         try:
@@ -121,7 +130,8 @@ def main():
             count = 0
             for item in results:
                 vid = item.get('id')
-                if vid and transcribe_video(vid, output_dir, cookies):
+                url = item.get('url') or f"https://www.youtube.com/watch?v={vid}"
+                if vid and transcribe_video(vid, output_dir, url, cookies):
                     count += 1
             
             print(f"\nBatch process complete. {count} items processed.")
@@ -134,11 +144,11 @@ def main():
     if not video_id:
         print(f"Invalid Video ID or URL: {target}")
         sys.exit(1)
+    
+    # Use full URL if provided, otherwise reconstruct it for the signature
+    url = target if target.startswith("http") else f"https://www.youtube.com/watch?v={video_id}"
         
     output_dir = "data/transcripts"
     os.makedirs(output_dir, exist_ok=True)
     
-    transcribe_video(video_id, output_dir, cookies)
-
-if __name__ == "__main__":
-    main()
+    transcribe_video(video_id, output_dir, url, cookies)
