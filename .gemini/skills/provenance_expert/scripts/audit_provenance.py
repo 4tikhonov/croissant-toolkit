@@ -8,7 +8,29 @@ def audit_provenance(query, output_format="text"):
     Analyzes the provenance graph and reports the status of all actions 
     associated with a specific user query.
     """
+    # 1. Resolve dynamic data root based on query UNF
     graph_path = "data/graph/provenance.jsonld"
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        skills_dir = os.path.dirname(os.path.dirname(script_dir))
+        unf_script = os.path.join(skills_dir, "unf", "scripts", "unf_hash.py")
+        if os.path.exists(unf_script):
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("unf_hash", unf_script)
+            unf_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(unf_mod)
+            
+            query_unf = unf_mod.compute_unf_string(query)
+            if query_unf:
+                clean_unf = query_unf.replace("UNF:6:", "").replace("UNF6:", "").replace("/", "_")
+                partitioned_path = f"data/{clean_unf}/graph/provenance.jsonld"
+                if os.path.exists(partitioned_path):
+                    graph_path = partitioned_path
+                    # Also set DATA_ROOT for os.walk logic later
+                    os.environ["DATA_ROOT"] = f"data/{clean_unf}"
+    except Exception as e:
+        print(f"Warning: Failed to resolve partitioned graph: {e}", file=sys.stderr)
+
     if not os.path.exists(graph_path):
         print(f"Error: Provenance graph not found at {graph_path}")
         return
@@ -24,7 +46,26 @@ def audit_provenance(query, output_format="text"):
 
     # Find activities associated with this query and the query's UNF
     matching_activities = []
-    query_unf = "No Fingerprint"
+    
+    # Pre-compute query UNF for comparison
+    target_query_unf = "No Fingerprint"
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        skills_dir = os.path.dirname(os.path.dirname(script_dir))
+        unf_script = os.path.join(skills_dir, "unf", "scripts", "unf_hash.py")
+        if os.path.exists(unf_script):
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("unf_hash", unf_script)
+            unf_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(unf_mod)
+            target_query_unf = unf_mod.compute_unf_string(query)
+            if target_query_unf:
+                target_query_unf = target_query_unf.replace("UNF:6:", "UNF6:")
+    except Exception:
+        pass
+
+    normalized_query = " ".join(query.lower().split())
+    
     for node in graph:
         if node.get("@type") == "prov:Activity":
             used_entities = node.get("prov:used", [])
@@ -32,20 +73,27 @@ def audit_provenance(query, output_format="text"):
                 used_entities = [used_entities]
                 
             for entity in used_entities:
-                if entity.get("sc:value") == query:
+                # Try matching by UNF first (most reliable)
+                e_unf = entity.get("sc:identifier")
+                if e_unf and target_query_unf != "No Fingerprint" and e_unf == target_query_unf:
                     matching_activities.append(node)
-                    if entity.get("sc:identifier"):
-                        query_unf = entity.get("sc:identifier")
                     break
+                
+                # Fallback to normalized value match
+                e_val = entity.get("sc:value")
+                if e_val:
+                    norm_e_val = " ".join(e_val.lower().split())
+                    if norm_e_val == normalized_query:
+                        matching_activities.append(node)
+                        break
 
     if not matching_activities:
         if output_format == "text":
             print(f"\n[Provenance Expert] No records found for query: \"{query}\"")
         return
 
-    if output_format == "json-ld":
-        # Enrich the subgraph with audit metadata before exporting
-        for activity in matching_activities:
+    # --- Enrichment and Physical Verification ---
+    for activity in matching_activities:
             # 1. Ensure actionStatus is present (default to Completed if missing from older logs)
             if "sc:actionStatus" not in activity:
                 activity["sc:actionStatus"] = "sc:CompletedActionStatus"
@@ -61,7 +109,8 @@ def audit_provenance(query, output_format="text"):
                     # Perform physical verification
                     found_path = None
                     file_size = 0
-                    for root, dirs, files in os.walk("data"):
+                    data_root = os.environ.get("DATA_ROOT", "data")
+                    for root, dirs, files in os.walk(data_root):
                         if file_name in files:
                             found_path = os.path.join(root, file_name)
                             file_size = os.path.getsize(found_path)
@@ -70,10 +119,32 @@ def audit_provenance(query, output_format="text"):
                     if found_path:
                         output["sc:contentSize"] = f"{file_size} B"
                         output["sc:additionalType"] = "https://schema.org/VerifiedFile"
-                        output["sc:description"] = "✅ Verified on local storage" if file_size > 0 else "⚠️ Empty file detected"
+                        
+                        # --- Deep Error Analysis ---
+                        status_msg = "✅ VERIFIED ON DISK"
+                        if file_size == 0:
+                            status_msg = "⚠️ EMPTY FILE DETECTED"
+                        elif found_path.endswith((".json", ".jsonld")):
+                            try:
+                                with open(found_path, 'r', encoding='utf-8') as f:
+                                    artifact_data = json.load(f)
+                                    artifact_str = json.dumps(artifact_data).lower()
+                                    if "error" in artifact_str or "timeout" in artifact_str or "fail" in artifact_str:
+                                        status_msg = "❌ INTERNAL ERROR DETECTED IN CONTENT"
+                                        # Extract error if it's a simple dict
+                                        if isinstance(artifact_data, dict) and "error" in artifact_data:
+                                            status_msg += f": {artifact_data['error']}"
+                                        elif isinstance(artifact_data, dict) and "ollama" in artifact_data and isinstance(artifact_data["ollama"], dict) and "error" in artifact_data["ollama"]:
+                                             status_msg += f": {artifact_data['ollama']['error']}"
+                            except Exception:
+                                pass
+                        
+                        output["sc:description"] = status_msg
+                        # print(f"DEBUG: Set {file_name} desc to {status_msg}")
                     else:
                         output["sc:description"] = "❌ File missing from local storage"
 
+    if output_format == "json-ld":
         # Extract the relevant subgraph
         subgraph = {
             "@context": context,
@@ -88,7 +159,7 @@ def audit_provenance(query, output_format="text"):
     print(f"\n" + "="*80)
     print(f"PROVENANCE AUDIT REPORT")
     print(f"Query: \"{query}\"")
-    print(f"UNF:   {query_unf}")
+    print(f"UNF:   {target_query_unf}")
     print("="*80)
 
     for i, activity in enumerate(matching_activities, 1):
@@ -117,26 +188,19 @@ def audit_provenance(query, output_format="text"):
         for output in outputs:
             file_name = output.get("sc:name", "Unknown File")
             unf = output.get("sc:identifier", "No UNF")
+            desc = output.get("sc:description", "❌ Not checked")
             
-            # Verify physical existence and non-empty status
-            found_path = None
-            is_empty = False
-            for root, dirs, files in os.walk("data"):
+            # Find the path for display
+            display_path = file_name
+            data_root = os.environ.get("DATA_ROOT", "data")
+            for root, dirs, files in os.walk(data_root):
                 if file_name in files:
-                    found_path = os.path.join(root, file_name)
-                    if os.path.getsize(found_path) == 0:
-                        is_empty = True
+                    full_p = os.path.join(root, file_name)
+                    display_path = os.path.relpath(full_p, os.getcwd())
                     break
             
-            if found_path and not is_empty:
-                print(f"      - {file_name} [UNF: {unf}]")
-                print(f"        Path: {found_path} -> ✅ VERIFIED ON DISK")
-            elif is_empty:
-                print(f"      - {file_name} [UNF: {unf}]")
-                print(f"        Path: {found_path} -> ⚠️ FAILED (Empty File)")
-            else:
-                print(f"      - {file_name} [UNF: {unf}]")
-                print(f"        ❌ FAILED: File not found on local storage")
+            print(f"      - {file_name} [UNF: {unf}]")
+            print(f"        Path: {display_path} -> {desc}")
 
     print("\n" + "="*80)
     print(f"Audit Complete. Found {len(matching_activities)} verified actions.")
