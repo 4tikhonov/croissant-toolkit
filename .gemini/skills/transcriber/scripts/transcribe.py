@@ -124,25 +124,22 @@ def transcribe_video(video_id, output_dir, target_url, cookies_path=None, query=
                 # --- Note: Croissant Serialization is now handled by a separate expert ---
                 print(f"Successfully saved metadata to {meta_path}")
 
-                        # --- Provenance Graph Logging ---
-                        try:
-                            log_script_path = os.path.join(root_dir, ".gemini", "skills", "unf", "scripts", "log_provenance.py")
-                            if os.path.exists(log_script_path):
-                                spec = importlib.util.spec_from_file_location("log_provenance", log_script_path)
-                                log_module = importlib.util.module_from_spec(spec)
-                                spec.loader.exec_module(log_module)
-                                
-                                inputs = [{"@type": "URL", "url": target_url, "identifier": command_unf}]
-                                outputs = [
-                                    {"@type": "FileObject", "name": f"{video_id}.txt", "unf": transcript_unf},
-                                    {"@type": "FileObject", "name": f"{video_id}.json", "unf": metadata.get("unf")}
-                                ]
-                                log_module.log_action("transcribe_and_serialize", inputs, outputs, script_path=script_path_abs, query=query, status="Completed")
-                        except Exception as log_err:
-                            print(f"Warning: Provenance logging failed: {log_err}")
-                except Exception as croissant_err:
-                    print(f"Warning: Croissant serialization failed: {croissant_err}")
-                    log_failure("transcribe_and_serialize", video_id, target_url, query, str(croissant_err))
+                # --- Provenance Graph Logging ---
+                try:
+                    log_script_path = os.path.join(root_dir, ".gemini", "skills", "unf", "scripts", "log_provenance.py")
+                    if os.path.exists(log_script_path):
+                        spec = importlib.util.spec_from_file_location("log_provenance", log_script_path)
+                        log_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(log_module)
+                        
+                        inputs = [{"@type": "URL", "url": target_url, "identifier": command_unf}]
+                        outputs = [
+                            {"@type": "FileObject", "name": f"{video_id}.txt", "unf": transcript_unf},
+                            {"@type": "FileObject", "name": f"{video_id}.json", "unf": metadata.get("unf")}
+                        ]
+                        log_module.log_action("transcribe_and_serialize", inputs, outputs, script_path=script_path_abs, query=query, status="Completed")
+                except Exception as log_err:
+                    print(f"Warning: Provenance logging failed: {log_err}")
         except ImportError:
             pass
             
