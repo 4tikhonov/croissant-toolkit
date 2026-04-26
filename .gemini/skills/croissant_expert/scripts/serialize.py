@@ -311,33 +311,50 @@ def main():
         output_dir = os.path.join(data_root, "croissant")
         os.makedirs(output_dir, exist_ok=True)
 
-        # --- Auto-detect NLP Entities ---
-        nlp_dir = os.path.join(data_root, "nlp")
-        if os.path.exists(nlp_dir):
-            for f_name in os.listdir(nlp_dir):
-                if f_name.endswith(".entities.jsonld"):
-                    # Check if already in distribution
-                    dist_list = metadata.get("distribution", [])
-                    if not any(d.get("name") == "nlp_entities" for d in dist_list):
-                        full_path = os.path.abspath(os.path.join(nlp_dir, f_name))
+        # --- Recursive Auto-detect of all artifacts in the partition ---
+        dist_list = metadata.get("distribution", [])
+        seen_files = {d.get("name") for d in dist_list}
+        
+        # Define subfolders to scan (all within data_root)
+        folders_to_scan = ["nlp", "transcripts", "metadata", "cdif", "variables", "graph", "croissant"]
+        
+        for folder in folders_to_scan:
+            folder_path = os.path.join(data_root, folder)
+            if os.path.exists(folder_path):
+                for f_name in os.listdir(folder_path):
+                    if f_name.startswith(".") or f_name.endswith((".log", ".tmp")): continue
+                    
+                    full_path = os.path.abspath(os.path.join(folder_path, f_name))
+                    if os.path.isdir(full_path): continue
+                    
+                    # Create a friendly name (e.g. nlp_entities, cdif_inventory, etc.)
+                    if f_name.endswith(".entities.jsonld"): name = "nlp_entities"
+                    elif f_name == "provenance.jsonld": name = "provenance_graph"
+                    else: name = f"{folder}_{os.path.splitext(f_name)[0]}"
+                    
+                    if name not in seen_files:
                         # Try to get UNF
                         ent_unf = None
                         try:
-                            # We already loaded unf_mod above if available
                             if 'unf_mod' in locals():
                                 ent_unf = unf_mod.compute_unf_file(full_path)
                                 if ent_unf: ent_unf = ent_unf.replace("UNF:6:", "UNF6:")
                         except Exception: pass
 
+                        encoding = "application/ld+json" if f_name.endswith((".jsonld", ".json")) else "text/plain"
+                        if f_name.endswith(".txt"): encoding = "text/plain"
+                        
                         dist_list.append({
                             "type": "FileObject",
-                            "name": "nlp_entities",
+                            "name": name,
                             "contentUrl": f"file://{full_path}",
-                            "encodingFormat": "application/ld+json",
+                            "encodingFormat": encoding,
                             "unf": ent_unf
                         })
-                        metadata["distribution"] = dist_list
-                        print(f"[Croissant] Auto-linked NLP entities: {f_name}")
+                        seen_files.add(name)
+                        print(f"[Croissant] Auto-linked artifact: {folder}/{f_name} as '{name}'")
+        
+        metadata["distribution"] = dist_list
 
         output_file = ""
         for i in range(2, len(all_args)):
