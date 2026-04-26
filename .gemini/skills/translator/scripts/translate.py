@@ -149,7 +149,7 @@ def main():
         print(f"[{args.target} Translation]:")
         print(translated_text)
         print("-" * 50)
-        
+        if args.unf:
             unf_val = compute_unf(translated_text)
             print(f"[UNF Fingerprint]: {unf_val}")
             print("-" * 50)
