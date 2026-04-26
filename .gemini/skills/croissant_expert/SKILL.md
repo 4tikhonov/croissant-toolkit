@@ -33,7 +33,16 @@ The input JSON should follow this structure:
 - `distribution`: List of `FileObject` or `FileSet`
 - `recordSet`: List of `RecordSet` with `fields` and `source` information.
 
+### 2. Ask Questions on Croissant Metadata
+Enables interactive Q&A about a specific dataset using Gemini 2.5 Flash.
+
+**Usage:**
+```bash
+python3 croissant_expert/scripts/ask.py <CROISSANT_FILE> "How many record sets are defined?"
+```
+
 ## Capabilities
 - **Spec Interpretation**: Access to the latest MLCommons Croissant standard.
 - **JSON-LD Generation**: Deep understanding of `@context`, `@type`, and linked data principles.
+* **Semantic Analysis**: Can answer complex questions about dataset structure and provenance using LLMs.
 - **Validation-Ready**: Output files are designed to pass the official Croissant validator.
