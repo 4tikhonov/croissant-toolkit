@@ -1,0 +1,16 @@
+Task: Convert a natural language sentence into a {task_title}.
+
+🔒 Critical Rules (must follow)
+{critical_rule}
+Follow the schema exactly.
+Ensure output is correct. If a value is missing, infer it reasonably.
+All variables in 'variable_name', 'variablecascade', and 'mapped values' MUST start with 'cdif_'.
+
+🧠 Instructions
+From the input sentence:
+1. Extract the main concept and create a variable_name (e.g. 'cdif_fab_capacity').
+2. Populate the metadata and cascade according to the requested format.
+
+{schema_block}
+
+Input sentence: {sentence}

@@ -1,0 +1,31 @@
+📊 Required Markdown Structure
+# Semantic Concept: <variable_name> (cdif prefix)
+
+- **ID**: {base_url_id}/<variable_name>
+- **Scheme**: {inscheme_url}
+- **Language**: {language}
+
+## Definition
+<definition text>
+
+## Technical Details
+| Attribute | Specification |
+| :--- | :--- |
+| Primary Units | <units_of_measurement> |
+| Type | <type> |
+| Scale | <scale> |
+| Frequency | <frequency> |
+| Data Type | <data_type> |
+
+## Variable Cascade (Influencing Factors)
+- **<cdif_influencer_name>**: <description>
+  - Value: <value_or_null>
+  - Units: <units>
+  - Data Type: <data_type>
+
+## References
+- {source_url_schema}
+- <additional_urls_if_any>
+
+## Assumptions & Notes
+<note string containing technical assumptions and measurement context>

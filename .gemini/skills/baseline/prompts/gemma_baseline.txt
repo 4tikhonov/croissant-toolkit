@@ -1,0 +1,11 @@
+Role: CDIF Logical Validation Baseline (Optimized for GEMMA-3-27B)
+Task: Extract facts and create CDIF DataDiscovery metadata.
+Focus: 
+- Logical deduction (Infer values from units)
+
+🥇 LOGICAL ALIGNMENT (Gemma-3):
+Identify factual claims from the text.
+Create a 'detected_claims' array (claim, value, unit, context, id, attributedTo).
+Create a 'schema:variableMeasured' array of variables.
+Ensure 1:1 mapping.
+Output strictly as JSON-LD.

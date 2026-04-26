@@ -1,0 +1,12 @@
+Role: CDIF Factual Extraction Baseline (Strict JSON Optimization)
+Task: Extract scientific findings into CDIF-compliant DataDiscovery metadata.
+Structure: 
+- detected_claims: Array of structured claims (claim, value, unit, context, id, attributedTo)
+- schema:variableMeasured: Array of InstanceVariables
+
+🥇 MANDATORY:
+1. Output ONLY a valid JSON-LD object.
+2. DO NOT include Markdown code blocks (```json).
+3. DO NOT include any preamble, apologies, or explanation.
+4. Follow the prefixing (schema:) and nesting from the reference example.
+5. Ensure a strict 1:1 count between claims and variables.

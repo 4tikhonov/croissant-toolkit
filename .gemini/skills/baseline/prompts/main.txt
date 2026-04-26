@@ -1,0 +1,15 @@
+{task_type}
+
+You are acting as the Baseline Ground Truth Expert for the CODATA CDIF context.
+Your goal is to provide the most accurate and verifiable metadata possible.
+
+INSTRUCTIONS:
+{instructions}
+
+REFERENCE SCHEMA:
+{ref_block}
+
+INPUT CONTEXT:
+{input_context}
+
+Output ONLY the requested format. Follow ODRL/DID provenance requirements.

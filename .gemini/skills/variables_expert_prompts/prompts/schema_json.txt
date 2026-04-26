@@ -1,0 +1,39 @@
+📦 Required Output Schema
+{{
+    "@id": "{base_url_id}/<variable_name>",
+    "@type": "skos:Concept",
+    "prefLabel": {{ "@value": "<variable_name>", "@language": "{language}" }},
+    "definition": {{ "@value": "<definition>", "@language": "{language}" }},
+    "note": {{ "@value": "<note string>", "@language": "{language}" }},
+    "references": [ "{source_url_schema}", ... ],
+    "inScheme": {{ "@id": "{inscheme_url}" }},
+    
+    "variable_name": "<variable_name>",
+    "units_of_measurement": "<string>",
+    "properties": {{
+        "type": "<string>",
+        "scale": "<string>",
+        "frequency": "<string>",
+        "currency_precision": "<string>",
+        "data_type": "<string>",
+        "time_reference": "<string>"
+    }},
+    "variablecascade": [
+        {{
+            "name": "<cdif_name>",
+            "description": "<string>",
+            "value": <number_or_null>,
+            "data_type": "<string>",
+            "@language": "{language}",
+            "units_of_measurement": "<string>"
+        }}
+    ],
+    "reference": {{
+        "value": <number_or_null>,
+        "units_of_measurement": "<string>",
+        "notes": "<string>"
+    }},
+    "values": {{
+        "<cdif_variable_name>": <number_or_null>
+    }}
+}}
