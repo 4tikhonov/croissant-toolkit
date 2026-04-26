@@ -23,6 +23,14 @@ python3 .gemini/skills/kreuzberg/scripts/extract.py <INPUT_PATH> [OUTPUT_FILE]
 - `[OUTPUT_FILE]`: (Optional) path to save the extracted Markdown. If omitted, results go to `data/extrated/`.
 - `--json`: (Internal) Output full metadata including Croissant JSON-LD.
 
+### 2. `cdif_expert.py`
+A semantic mapping tool that converts extracted text into **CDIF-compliant** variables and concepts using Ollama intelligence.
+
+**Usage:**
+```bash
+python3 .gemini/skills/kreuzberg/scripts/cdif_expert.py data/extracted/<FILENAME>.md
+```
+
 ## Examples
 
 ### Extracting a PDF to Markdown

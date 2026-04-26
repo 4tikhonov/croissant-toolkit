@@ -176,13 +176,30 @@ def main():
                 
                 inputs = [{"@type": "sc:Text", "value": content[:100] + "..." if len(content) > 100 else content}]
                 outputs = [{"@type": "FileObject", "name": os.path.basename(output_path), "unf": result.get("unf")}]
-                log_module.log_action("extract_entities", inputs, outputs, script_path=script_path_abs, query=query)
+                log_module.log_action("extract_entities", inputs, outputs, script_path=script_path_abs, query=query, status="Completed")
         except Exception as log_err:
             print(f"[NLP] Warning: Provenance logging failed: {log_err}")
             
         print(f"\n[NLP] Saved to: {output_path}")
     else:
         print("[NLP] Extraction failed entirely.")
+        
+        # --- Log Failure to Provenance ---
+        try:
+            # We need to resolve skills_dir here too
+            script_path_abs = os.path.abspath(__file__)
+            skills_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_path_abs)))
+            log_script_path = os.path.join(skills_dir, "unf", "scripts", "log_provenance.py")
+            if os.path.exists(log_script_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("log_provenance", log_script_path)
+                log_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(log_module)
+                
+                inputs = [{"@type": "sc:Text", "value": content[:100] + "..." if len(content) > 100 else content}]
+                log_module.log_action("extract_entities", inputs, [], script_path=script_path_abs, query=query, status="Failed")
+        except Exception as log_err:
+            print(f"[NLP] Warning: Failure logging failed: {log_err}")
 
 if __name__ == "__main__":
     main()

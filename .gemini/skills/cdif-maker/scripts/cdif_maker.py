@@ -83,7 +83,7 @@ def main():
             
             inputs = [{"@type": "sc:Text", "value": term}]
             outputs = [{"@type": "FileObject", "name": os.path.basename(report_path), "unf": data.get("unf")}]
-            log_module.log_action("generate_cdif_inventory", inputs, outputs, script_path=script_path_abs, query=args.query)
+            log_module.log_action("generate_cdif_inventory", inputs, outputs, script_path=script_path_abs, query=args.query, status="Completed")
     except Exception as log_err:
         print(f"Warning: Provenance logging failed: {log_err}")
 
