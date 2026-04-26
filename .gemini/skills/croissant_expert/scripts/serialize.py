@@ -158,7 +158,8 @@ def create_croissant_jsonld(metadata):
                 "name": dist.get("name"),
                 "contentUrl": dist.get("contentUrl"),
                 "encodingFormat": dist.get("encodingFormat"),
-                "sha256": dist.get("sha256")
+                "sha256": dist.get("sha256"),
+                "unf": dist.get("unf")
             }
         elif dist_type == "FileSet":
             obj = {
@@ -166,7 +167,8 @@ def create_croissant_jsonld(metadata):
                 "name": dist.get("name"),
                 "containedIn": dist.get("containedIn"),
                 "encodingFormat": dist.get("encodingFormat"),
-                "includes": dist.get("includes")
+                "includes": dist.get("includes"),
+                "unf": dist.get("unf")
             }
         
         # Clean up null values
@@ -213,6 +215,23 @@ def create_croissant_jsonld(metadata):
             fields_list.append(field)
         
         record_set_list.append(record_set)
+    
+    # --- UNF Fingerprinting ---
+    try:
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        unf_script_path = os.path.join(root_dir, "unf", "scripts", "unf_hash.py")
+        if os.path.exists(unf_script_path):
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("unf_hash", unf_script_path)
+            unf_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(unf_module)
+            
+            # Compute UNF of the dataset dictionary (excluding itself)
+            dataset_unf = unf_module.compute_unf_json(dataset)
+            if dataset_unf:
+                dataset["sc:identifier"] = dataset_unf.replace("UNF:6:", "UNF6:")
+    except Exception as e:
+        print(f"Warning: Croissant fingerprinting failed: {e}")
 
     return dataset
 

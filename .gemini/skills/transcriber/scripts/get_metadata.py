@@ -12,7 +12,7 @@ def get_video_id(url_or_id):
     if len(url_or_id) == 11: return url_or_id
     return None
 
-def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
+def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None, transcript_unf=None):
     from requests import Session
     url = f"https://www.youtube.com/watch?v={video_id}"
     
@@ -190,6 +190,7 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
             "url": url,
             "transcript": transcript_text or "",
             "contentSignature": unf_hash,
+            "transcriptFingerprint": transcript_unf,
             "author": [{"@type": "Person", "name": author_name}] if author_name else [],
             "creator": [{"@type": "Organization", "name": author_name}] if author_name else [],
             "publisher": [{"@type": "Organization", "name": "YouTube"}],
@@ -203,7 +204,8 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
                     "type": "FileObject",
                     "name": "transcript",
                     "contentUrl": f"file://{os.path.abspath(os.path.join('data/transcripts', f'{video_id}.txt'))}",
-                    "encodingFormat": "text/plain"
+                    "encodingFormat": "text/plain",
+                    "unf": transcript_unf
                 },
                 {
                     "type": "FileObject",
@@ -268,6 +270,23 @@ def fetch_metadata(video_id, session=None, transcript_text=None, unf_hash=None):
             ]
         }
         
+        # --- Metadata Fingerprinting ---
+        try:
+            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+            unf_script_path = os.path.join(root_dir, ".gemini", "skills", "unf", "scripts", "unf_hash.py")
+            if os.path.exists(unf_script_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("unf_hash", unf_script_path)
+                unf_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(unf_module)
+                
+                # Compute UNF of the metadata dictionary (excluding itself)
+                metadata_unf = unf_module.compute_unf_json(metadata)
+                if metadata_unf:
+                    metadata["unf"] = metadata_unf.replace("UNF:6:", "UNF6:")
+        except Exception as e:
+            print(f"Warning: Metadata fingerprinting failed: {e}")
+
         return metadata
     except Exception as e:
         print(f"Error fetching metadata: {e}")

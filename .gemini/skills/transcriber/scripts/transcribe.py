@@ -15,7 +15,7 @@ def get_video_id(url_or_id):
         return url_or_id
     return None
 
-def transcribe_video(video_id, output_dir, target_url, cookies_path=None):
+def transcribe_video(video_id, output_dir, target_url, cookies_path=None, query=None):
     from requests import Session
     import http.cookiejar
 
@@ -55,20 +55,13 @@ def transcribe_video(video_id, output_dir, target_url, cookies_path=None):
             
         print(f"Successfully saved transcript to {output_path}")
 
-        # --- Fingerprinting the Command Invocation (Provenance) ---
-        unf_hash = None
+        # --- Fingerprinting (Provenance) ---
+        transcript_unf = None
+        command_unf = None
         try:
             # Dynamically resolve the relative path of this script from the project root
             script_path_abs = os.path.abspath(__file__)
             root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_path_abs)))))
-            script_rel_path = os.path.relpath(script_path_abs, root_dir)
-            
-            # Ensure it starts with .gemini (match manual test exactly)
-            if not script_rel_path.startswith("."):
-                script_rel_path = f"{script_rel_path}"
-            
-            # Construct the command string requested for the UNF signature
-            command_string = f"{script_rel_path} {target_url}"
             
             # Dynamically locate the UNF skill
             unf_script_path = os.path.join(root_dir, ".gemini", "skills", "unf", "scripts", "unf_hash.py")
@@ -78,22 +71,33 @@ def transcribe_video(video_id, output_dir, target_url, cookies_path=None):
                 unf_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(unf_module)
                 
-                print(f"Signature String: {command_string}")
-                unf_hash = unf_module.compute_unf_string(command_string)
-                if unf_hash:
-                    # Clean up prefix for metadata consistency
-                    if unf_hash.startswith("UNF:6:"):
-                        unf_hash = unf_hash.replace("UNF:6:", "UNF6:")
-                    print(f"Command Signature: {unf_hash}")
+                # 1. Fingerprint the transcript CONTENT
+                transcript_unf = unf_module.compute_unf_string(full_text)
+                if transcript_unf:
+                    transcript_unf = transcript_unf.replace("UNF:6:", "UNF6:")
+                    print(f"Transcript Fingerprint: {transcript_unf}")
+
+                # 2. Fingerprint the COMMAND invocation (for provenance)
+                script_path_abs = os.path.abspath(__file__)
+                script_rel_path = os.path.relpath(script_path_abs, root_dir)
+                command_string = f"{script_rel_path} {target_url}"
+                command_unf = unf_module.compute_unf_string(command_string)
+                if command_unf:
+                    command_unf = command_unf.replace("UNF:6:", "UNF6:")
+                    print(f"Command Signature: {command_unf}")
         except Exception as unf_err:
-            print(f"Warning: Command fingerprinting failed: {unf_err}")
+            print(f"Warning: Fingerprinting failed: {unf_err}")
 
         # Use the SAME session to fetch metadata immediately
         try:
             from get_metadata import fetch_metadata
             print("Fetching metadata with shared session and transcript...")
-            metadata = fetch_metadata(video_id, session=session, transcript_text=full_text, unf_hash=unf_hash)
+            metadata = fetch_metadata(video_id, session=session, transcript_text=full_text, unf_hash=command_unf, transcript_unf=transcript_unf)
             if metadata:
+                # Add query to metadata for traceability
+                if query:
+                    metadata["userQuery"] = query
+
                 meta_dir = "data/metadata"
                 os.makedirs(meta_dir, exist_ok=True)
                 meta_path = os.path.join(meta_dir, f"{video_id}.json")
@@ -119,6 +123,24 @@ def transcribe_video(video_id, output_dir, target_url, cookies_path=None):
                         with open(croissant_path, 'w', encoding='utf-8') as f:
                             json.dump(croissant_data, f, indent=4, ensure_ascii=False)
                         print(f"Successfully saved Croissant metadata to {croissant_path}")
+
+                        # --- Provenance Graph Logging ---
+                        try:
+                            log_script_path = os.path.join(root_dir, ".gemini", "skills", "unf", "scripts", "log_provenance.py")
+                            if os.path.exists(log_script_path):
+                                spec = importlib.util.spec_from_file_location("log_provenance", log_script_path)
+                                log_module = importlib.util.module_from_spec(spec)
+                                spec.loader.exec_module(log_module)
+                                
+                                inputs = [{"@type": "URL", "url": target_url, "identifier": command_unf}]
+                                outputs = [
+                                    {"@type": "FileObject", "name": f"{video_id}.txt", "unf": transcript_unf},
+                                    {"@type": "FileObject", "name": f"{video_id}.json", "unf": metadata.get("unf")},
+                                    {"@type": "FileObject", "name": f"{video_id}-croissant.json", "unf": croissant_data.get("sc:identifier")}
+                                ]
+                                log_module.log_action("transcribe_and_serialize", inputs, outputs, script_path=script_path_abs, query=query)
+                        except Exception as log_err:
+                            print(f"Warning: Provenance logging failed: {log_err}")
                 except Exception as croissant_err:
                     print(f"Warning: Croissant serialization failed: {croissant_err}")
         except ImportError:
@@ -134,11 +156,13 @@ def main():
     parser = argparse.ArgumentParser(description="YouTube Transcriber with Metadata Support")
     parser.add_argument('target', nargs='?', help='Video ID or URL')
     parser.add_argument('--cookies', help='Path to cookies.txt file in Netscape format')
+    parser.add_argument('--query', help='Original user query for traceability')
     
     args = parser.parse_args()
     
     cookies = args.cookies
     target = args.target
+    query = args.query
 
     # Add script directory to path for imports
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -158,7 +182,7 @@ def main():
             for item in results:
                 vid = item.get('id')
                 url = item.get('url') or f"https://www.youtube.com/watch?v={vid}"
-                if vid and transcribe_video(vid, output_dir, url, cookies):
+                if vid and transcribe_video(vid, output_dir, url, cookies, query=query):
                     count += 1
             
             print(f"\nBatch process complete. {count} items processed.")
@@ -178,7 +202,7 @@ def main():
     output_dir = "data/transcripts"
     os.makedirs(output_dir, exist_ok=True)
     
-    transcribe_video(video_id, output_dir, url, cookies)
+    transcribe_video(video_id, output_dir, url, cookies, query=query)
 
 if __name__ == "__main__":
     main()

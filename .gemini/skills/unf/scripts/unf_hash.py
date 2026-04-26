@@ -1,32 +1,42 @@
 import os
 import sys
 import argparse
+import json
 from pathlib import Path
 
 # Add the local lib/ directory to sys.path to access the UNF library
 lib_path = Path(__file__).parent.parent / "lib"
-sys.path.insert(0, str(lib_path))
+if str(lib_path) not in sys.path:
+    sys.path.insert(0, str(lib_path))
 
 try:
     import polars as pl
 except ImportError:
-    print("ERROR: 'polars' library not found. Please install it with 'pip install polars'.")
-    sys.exit(1)
+    # Fail silently or log if imported as a library, but error in CLI
+    pass
 
 try:
     from dartfx.unf import unf_column, unf_file, unf_dataset
-except ImportError as e:
-    print(f"ERROR: Failed to load UNF library from {lib_path}: {e}")
-    sys.exit(1)
+except ImportError:
+    pass
 
 def compute_unf_string(input_string):
     """Compute UNF for a single string vector (split and sorted)."""
+    import polars as pl
+    from dartfx.unf import unf_column
     words = sorted(input_string.split())
     series = pl.Series(words)
     return unf_column(series)
 
+def compute_unf_json(data):
+    """Compute UNF for a JSON object by sorting keys and hashing the string."""
+    json_str = json.dumps(data, sort_keys=True)
+    return compute_unf_string(json_str)
+
 def compute_unf_file(file_path, json_report=False):
     """Compute UNF for a data file (CSV, Parquet, etc.). Falls back to raw string for text files."""
+    import polars as pl
+    from dartfx.unf import unf_file
     path = Path(file_path)
     if not path.exists():
         print(f"ERROR: File not found: {file_path}")
