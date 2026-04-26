@@ -153,8 +153,24 @@ def main():
     args = parser.parse_args()
 
     input_path = args.input
-    output_dir = args.output_dir
     query = args.query or input_path
+    
+    # Auto-resolve DATA_ROOT if query is provided and not already set
+    if query and not os.environ.get("DATA_ROOT"):
+        try:
+            script_path_abs = os.path.abspath(__file__)
+            skills_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_path_abs)))
+            unf_script = os.path.join(skills_dir, "unf", "scripts", "unf_hash.py")
+            if os.path.exists(unf_script):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("unf_hash", unf_script)
+                unf_mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(unf_mod)
+                os.environ["DATA_ROOT"] = unf_mod.get_partitioned_root(query)
+        except Exception:
+            pass
+
+    output_dir = args.output_dir if args.output_dir != "data/extracted" else os.path.join(os.environ.get("DATA_ROOT", "data"), "extracted")
 
     if os.path.isfile(input_path):
         extract_single_file(input_path, output_dir, query=query)

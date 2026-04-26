@@ -114,31 +114,15 @@ def transcribe_video(video_id, output_dir, target_url, cookies_path=None, query=
                 if query:
                     metadata["userQuery"] = query
 
-                meta_dir = "data/metadata"
+                meta_dir = os.path.join(os.environ.get("DATA_ROOT", "data"), "metadata")
                 os.makedirs(meta_dir, exist_ok=True)
                 meta_path = os.path.join(meta_dir, f"{video_id}.json")
                 with open(meta_path, 'w', encoding='utf-8') as f:
                     json.dump(metadata, f, indent=4, ensure_ascii=False)
                 print(f"Successfully saved metadata to {meta_path}")
 
-                # --- Croissant Serialization ---
-                try:
-                    croissant_script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "croissant_expert", "scripts", "serialize.py")
-                    if os.path.exists(croissant_script_path):
-                        import importlib.util
-                        spec = importlib.util.spec_from_file_location("serialize", croissant_script_path)
-                        croissant_module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(croissant_module)
-                        
-                        print(f"Generating Croissant JSON-LD for {video_id}...")
-                        croissant_data = croissant_module.create_croissant_jsonld(metadata)
-                        
-                        croissant_dir = "data/croissant"
-                        os.makedirs(croissant_dir, exist_ok=True)
-                        croissant_path = os.path.join(croissant_dir, f"{video_id}-croissant.json")
-                        with open(croissant_path, 'w', encoding='utf-8') as f:
-                            json.dump(croissant_data, f, indent=4, ensure_ascii=False)
-                        print(f"Successfully saved Croissant metadata to {croissant_path}")
+                # --- Note: Croissant Serialization is now handled by a separate expert ---
+                print(f"Successfully saved metadata to {meta_path}")
 
                         # --- Provenance Graph Logging ---
                         try:
@@ -151,8 +135,7 @@ def transcribe_video(video_id, output_dir, target_url, cookies_path=None, query=
                                 inputs = [{"@type": "URL", "url": target_url, "identifier": command_unf}]
                                 outputs = [
                                     {"@type": "FileObject", "name": f"{video_id}.txt", "unf": transcript_unf},
-                                    {"@type": "FileObject", "name": f"{video_id}.json", "unf": metadata.get("unf")},
-                                    {"@type": "FileObject", "name": f"{video_id}-croissant.json", "unf": croissant_data.get("sc:identifier")}
+                                    {"@type": "FileObject", "name": f"{video_id}.json", "unf": metadata.get("unf")}
                                 ]
                                 log_module.log_action("transcribe_and_serialize", inputs, outputs, script_path=script_path_abs, query=query, status="Completed")
                         except Exception as log_err:
@@ -187,14 +170,28 @@ def main():
     if script_dir not in sys.path:
         sys.path.append(script_dir)
 
+    # Auto-resolve DATA_ROOT if query is provided and not already set
+    if query and not os.environ.get("DATA_ROOT"):
+        try:
+            skills_dir = os.path.dirname(os.path.dirname(script_dir))
+            unf_script = os.path.join(skills_dir, "unf", "scripts", "unf_hash.py")
+            if os.path.exists(unf_script):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("unf_hash", unf_script)
+                unf_mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(unf_mod)
+                os.environ["DATA_ROOT"] = unf_mod.get_partitioned_root(query)
+        except Exception:
+            pass
+
+    output_dir = os.path.join(os.environ.get("DATA_ROOT", "data"), "transcripts")
+    os.makedirs(output_dir, exist_ok=True)
+
     if not target:
         if os.path.exists('youtube_search_results.json'):
             print("No arguments provided. Detecting batch mode...")
             with open('youtube_search_results.json', 'r') as f:
                 results = json.load(f)
-            
-            output_dir = "data/transcripts"
-            os.makedirs(output_dir, exist_ok=True)
             
             count = 0
             for item in results:
@@ -217,9 +214,7 @@ def main():
     # Use full URL if provided, otherwise reconstruct it for the signature
     url = target if target.startswith("http") else f"https://www.youtube.com/watch?v={video_id}"
         
-    output_dir = "data/transcripts"
-    os.makedirs(output_dir, exist_ok=True)
-    
+    # output_dir is already defined at line 190
     transcribe_video(video_id, output_dir, url, cookies, query=query)
 
 if __name__ == "__main__":

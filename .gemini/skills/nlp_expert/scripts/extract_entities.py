@@ -126,9 +126,24 @@ def main():
         print("\n--- Extracted Entities (JSON-LD) ---")
         print(json.dumps(result, indent=2, ensure_ascii=False))
         
-        output_dir = "data/nlp"
+        # Auto-resolve DATA_ROOT if query is provided and not already set
+        if query and not os.environ.get("DATA_ROOT"):
+            try:
+                script_path_abs = os.path.abspath(__file__)
+                skills_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_path_abs)))
+                unf_script = os.path.join(skills_dir, "unf", "scripts", "unf_hash.py")
+                if os.path.exists(unf_script):
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location("unf_hash", unf_script)
+                    unf_mod = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(unf_mod)
+                    os.environ["DATA_ROOT"] = unf_mod.get_partitioned_root(query)
+            except Exception:
+                pass
+
+        output_dir = os.path.join(os.environ.get("DATA_ROOT", "data"), "nlp")
         os.makedirs(output_dir, exist_ok=True)
-        
+            
         if os.path.isfile(input_val):
             filename = os.path.basename(input_val)
             output_path = os.path.join(output_dir, f"{filename}.entities.jsonld")
@@ -164,7 +179,7 @@ def main():
 
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
-            
+                
         # --- Provenance Graph Logging ---
         try:
             log_script_path = os.path.join(skills_dir, "unf", "scripts", "log_provenance.py")

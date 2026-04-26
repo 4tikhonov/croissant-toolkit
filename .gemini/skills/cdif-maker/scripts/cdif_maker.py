@@ -45,7 +45,29 @@ def main():
     safe_term = re.sub(r'[^a-zA-Z0-9]', '_', term).lower()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    output_dir = "data/cdif"
+    # Auto-resolve DATA_ROOT if query is provided
+    if args.query:
+        try:
+            # Dynamically resolve skills directory (3 levels up from scripts/)
+            script_path_abs = os.path.abspath(__file__)
+            skills_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_path_abs)))
+            unf_script = os.path.join(skills_dir, "unf", "scripts", "unf_hash.py")
+            if os.path.exists(unf_script):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("unf_hash", unf_script)
+                unf_mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(unf_mod)
+                # Set DATA_ROOT if not already set or if it's the default 'data'
+                current_root = os.environ.get("DATA_ROOT", "data")
+                if current_root == "data":
+                    partitioned_root = unf_mod.get_partitioned_root(args.query)
+                    if partitioned_root != "data":
+                        os.environ["DATA_ROOT"] = partitioned_root
+                        print(f"[Provenance] Partitioning data to: {partitioned_root}", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Failed to resolve partitioned data root: {e}", file=sys.stderr)
+
+    output_dir = os.path.join(os.environ.get("DATA_ROOT", "data"), "cdif")
     os.makedirs(output_dir, exist_ok=True)
     report_path = os.path.join(output_dir, f"inventory_{safe_term}_{timestamp}.json")
     

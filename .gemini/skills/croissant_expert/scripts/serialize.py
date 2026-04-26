@@ -65,10 +65,24 @@ def create_croissant_jsonld(metadata):
         return value
 
     def is_duplicate(item_val, collection):
-        """Robust check for duplicates in a list of multilingual dicts or strings."""
-        val_to_check = item_val["@value"] if isinstance(item_val, dict) else str(item_val)
+        """Robust check for duplicates in a list of multilingual dicts, complex objects, or strings."""
+        def get_val(item):
+            if isinstance(item, dict):
+                if "@value" in item: return str(item["@value"])
+                if "name" in item:
+                    n = item["name"]
+                    if isinstance(n, dict) and "@value" in n: return str(n["@value"])
+                    if isinstance(n, list) and len(n) > 0:
+                        # Handle list of multilingual names
+                        first = n[0]
+                        if isinstance(first, dict) and "@value" in first: return str(first["@value"])
+                        return str(first)
+                    return str(n)
+            return str(item)
+
+        val_to_check = get_val(item_val)
         for c in collection:
-            c_val = c["@value"] if isinstance(c, dict) else str(c)
+            c_val = get_val(c)
             if c_val.lower() == val_to_check.lower():
                 return True
         return False
@@ -240,58 +254,105 @@ def create_croissant_jsonld(metadata):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python3 serialize.py <METADATA_JSON_FILE> [OUTPUT_FILE]")
-        # Example metadata structure
+        print("Usage: python3 serialize.py <METADATA_JSON_FILE> [OUTPUT_FILE] [--nlp]")
         example = {
             "name": "Example Dataset",
             "description": "A simple example",
             "url": "https://example.com",
-            "distribution": [
-                {"name": "data-file", "contentUrl": "data.csv", "encodingFormat": "text/csv"}
-            ],
-            "recordSet": [
-                {
-                    "name": "main",
-                    "field": [
-                        {"name": "label", "dataType": "sc:Text", "source_file": "data-file", "extract_column": "label"}
-                    ]
-                }
-            ]
+            "userQuery": "Optional query for session partitioning",
+            "distribution": [{"name": "data-file", "contentUrl": "data.csv", "encodingFormat": "text/csv"}],
+            "recordSet": [{"name": "main", "field": [{"name": "label", "dataType": "sc:Text", "source_file": "data-file", "extract_column": "label"}]}]
         }
         print("\nExample Input JSON:")
         print(json.dumps(example, indent=2))
         sys.exit(1)
 
-    input_file = sys.argv[1]
-    output_dir = "data/croissant"
-    os.makedirs(output_dir, exist_ok=True)
-    
+    all_args = list(sys.argv)
+    input_file = ""
+    for i in range(1, len(all_args)):
+        if not all_args[i].startswith("--"):
+            input_file = all_args[i]
+            break
+            
+    if not input_file or not os.path.exists(input_file):
+        print(f"Error: Input file '{input_file}' not found.")
+        sys.exit(1)
+
     apply_nlp = "--nlp" in sys.argv
     
-    all_args = list(sys.argv)
-    output_file = ""
-    for i in range(2, len(all_args)):
-        arg_val = str(all_args[i])
-        if not arg_val.startswith("--"):
-            output_file = arg_val
-            break
-    
-    if output_file:
-        # If user provides a filename without a path, put it in the default dir
-        if not os.path.dirname(output_file):
-            output_file = os.path.join(output_dir, output_file)
-    else:
-        output_file = os.path.join(output_dir, "dataset-croissant.json")
-
     try:
         with open(input_file, 'r') as f:
             metadata = json.load(f)
         
         if apply_nlp:
             metadata["apply_nlp"] = True
-            
-        croissant_data = create_croissant_jsonld(metadata)
+
+        # Auto-resolve DATA_ROOT if query is provided
+        query = metadata.get("userQuery")
+        if query:
+            try:
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                skills_dir = os.path.dirname(os.path.dirname(script_dir))
+                unf_script = os.path.join(skills_dir, "unf", "scripts", "unf_hash.py")
+                if os.path.exists(unf_script):
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location("unf_hash", unf_script)
+                    unf_mod = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(unf_mod)
+                    current_root = os.environ.get("DATA_ROOT", "data")
+                    if current_root == "data":
+                        partitioned_root = unf_mod.get_partitioned_root(query)
+                        if partitioned_root != "data":
+                            os.environ["DATA_ROOT"] = partitioned_root
+            except Exception:
+                pass
+
+        data_root = os.environ.get("DATA_ROOT", "data")
+        output_dir = os.path.join(data_root, "croissant")
+        os.makedirs(output_dir, exist_ok=True)
+
+        # --- Auto-detect NLP Entities ---
+        nlp_dir = os.path.join(data_root, "nlp")
+        if os.path.exists(nlp_dir):
+            for f_name in os.listdir(nlp_dir):
+                if f_name.endswith(".entities.jsonld"):
+                    # Check if already in distribution
+                    dist_list = metadata.get("distribution", [])
+                    if not any(d.get("name") == "nlp_entities" for d in dist_list):
+                        full_path = os.path.abspath(os.path.join(nlp_dir, f_name))
+                        # Try to get UNF
+                        ent_unf = None
+                        try:
+                            # We already loaded unf_mod above if available
+                            if 'unf_mod' in locals():
+                                ent_unf = unf_mod.compute_unf_file(full_path)
+                                if ent_unf: ent_unf = ent_unf.replace("UNF:6:", "UNF6:")
+                        except Exception: pass
+
+                        dist_list.append({
+                            "type": "FileObject",
+                            "name": "nlp_entities",
+                            "contentUrl": f"file://{full_path}",
+                            "encodingFormat": "application/ld+json",
+                            "unf": ent_unf
+                        })
+                        metadata["distribution"] = dist_list
+                        print(f"[Croissant] Auto-linked NLP entities: {f_name}")
+
+        output_file = ""
+        for i in range(2, len(all_args)):
+            arg_val = str(all_args[i])
+            if not arg_val.startswith("--") and arg_val != input_file:
+                output_file = arg_val
+                break
         
+        if output_file:
+            if not os.path.dirname(output_file):
+                output_file = os.path.join(output_dir, output_file)
+        else:
+            output_file = os.path.join(output_dir, "dataset-croissant.json")
+
+        croissant_data = create_croissant_jsonld(metadata)
         with open(output_file, 'w') as f:
             json.dump(croissant_data, f, indent=2)
             

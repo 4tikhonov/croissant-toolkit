@@ -57,6 +57,19 @@ def compute_unf_file(file_path, json_report=False):
             print(f"ERROR: Failed to hash file {file_path}: {e}. Fallback failed: {read_err}")
             return None
 
+def get_partitioned_root(query):
+    """Computes a partitioned data root based on the query UNF."""
+    if not query:
+        return "data"
+    try:
+        unf_val = compute_unf_string(query)
+        if unf_val:
+            clean_unf = unf_val.replace("UNF:6:", "").replace("UNF6:", "").replace("/", "_")
+            return os.path.join("data", clean_unf)
+    except Exception:
+        pass
+    return "data"
+
 def main():
     parser = argparse.ArgumentParser(description="UNF Expert: Compute Universal Numeric Fingerprints (UNF v6).")
     parser.add_argument("input", help="The string to hash or the path to a data file (CSV, Parquet, etc.).")

@@ -15,7 +15,25 @@ def log_action(action_name, inputs, outputs, script_path=None, query=None, statu
         query (str): The user query that triggered the action
         status (str): Status of the action ('Success' or 'Failed')
     """
-    graph_dir = "data/graph"
+    # 1. Resolve DATA_ROOT (Session Partitioning)
+    data_root = os.environ.get("DATA_ROOT", "data")
+    if data_root == "data" and query:
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            unf_script_path = os.path.join(current_dir, "unf_hash.py")
+            if os.path.exists(unf_script_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("unf_hash", unf_script_path)
+                unf_mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(unf_mod)
+                partitioned_root = unf_mod.get_partitioned_root(query)
+                if partitioned_root != "data":
+                    data_root = partitioned_root
+                    os.environ["DATA_ROOT"] = data_root
+        except Exception:
+            pass
+
+    graph_dir = os.path.join(data_root, "graph")
     os.makedirs(graph_dir, exist_ok=True)
     graph_file = os.path.join(graph_dir, "provenance.jsonld")
     
