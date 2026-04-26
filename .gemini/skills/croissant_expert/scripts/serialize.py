@@ -218,15 +218,18 @@ def create_croissant_jsonld(metadata):
     
     # --- UNF Fingerprinting ---
     try:
-        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        unf_script_path = os.path.join(root_dir, "unf", "scripts", "unf_hash.py")
+        # Dynamically resolve skills directory (3 levels up from .gemini/skills/croissant_expert/scripts/)
+        script_path_abs = os.path.abspath(__file__)
+        skills_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_path_abs)))
+        unf_script_path = os.path.join(skills_dir, "unf", "scripts", "unf_hash.py")
+        
         if os.path.exists(unf_script_path):
             import importlib.util
             spec = importlib.util.spec_from_file_location("unf_hash", unf_script_path)
             unf_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(unf_module)
             
-            # Compute UNF of the dataset dictionary (excluding itself)
+            # Compute UNF of the dataset dictionary
             dataset_unf = unf_module.compute_unf_json(dataset)
             if dataset_unf:
                 dataset["sc:identifier"] = dataset_unf.replace("UNF:6:", "UNF6:")

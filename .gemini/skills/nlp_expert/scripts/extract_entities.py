@@ -3,6 +3,7 @@ import sys
 import json
 import re
 import subprocess
+import argparse
 
 def extract_entities(text):
     """
@@ -100,17 +101,13 @@ def extract_entities(text):
         return {"@context": "https://schema.org", "@type": "ItemList", "itemListElement": []}
 
 def main():
-    all_args = list(sys.argv)
-    if len(all_args) < 2:
-        print("Usage: python3 extract_entities.py <TEXT_OR_FILE_PATH>")
-        sys.exit(1)
-        
-    query = ""
-    for i in range(1, len(all_args)):
-        if query:
-            query += " "
-        query += str(all_args[i])
-    input_val = query
+    parser = argparse.ArgumentParser(description="NLP Entity Extraction with Provenance")
+    parser.add_argument('input', help='Text or file path to process')
+    parser.add_argument('--query', help='Original user query for traceability')
+    
+    args = parser.parse_args()
+    input_val = args.input
+    query = args.query
     
     if os.path.isfile(input_val):
         try:
@@ -138,8 +135,50 @@ def main():
         else:
             output_path = os.path.join(output_dir, "extracted_entities.jsonld")
             
+        # --- UNF Fingerprinting ---
+        try:
+            # Dynamically resolve project root (5 levels up from .gemini/skills/nlp_expert/scripts/)
+            # Or 3 levels up to reach .gemini/skills
+            script_path_abs = os.path.abspath(__file__)
+            skills_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_path_abs)))
+            unf_script_path = os.path.join(skills_dir, "unf", "scripts", "unf_hash.py")
+            
+            if os.path.exists(unf_script_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("unf_hash", unf_script_path)
+                unf_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(unf_module)
+                
+                # Compute UNF of the result dictionary
+                result_unf = unf_module.compute_unf_json(result)
+                if result_unf:
+                    result["unf"] = result_unf.replace("UNF:6:", "UNF6:")
+                else:
+                    print("[NLP] Warning: compute_unf_json returned None")
+            else:
+                print(f"[NLP] Warning: unf_hash.py not found at {unf_script_path}")
+        except Exception as e:
+            print(f"[NLP] Warning: Fingerprinting failed: {e}")
+            import traceback
+            traceback.print_exc()
+
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
+            
+        # --- Provenance Graph Logging ---
+        try:
+            log_script_path = os.path.join(skills_dir, "unf", "scripts", "log_provenance.py")
+            if os.path.exists(log_script_path):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("log_provenance", log_script_path)
+                log_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(log_module)
+                
+                inputs = [{"@type": "sc:Text", "value": content[:100] + "..." if len(content) > 100 else content}]
+                outputs = [{"@type": "FileObject", "name": os.path.basename(output_path), "unf": result.get("unf")}]
+                log_module.log_action("extract_entities", inputs, outputs, script_path=script_path_abs, query=query)
+        except Exception as log_err:
+            print(f"[NLP] Warning: Provenance logging failed: {log_err}")
             
         print(f"\n[NLP] Saved to: {output_path}")
     else:
