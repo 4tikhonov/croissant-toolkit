@@ -3,7 +3,7 @@ import json
 import datetime
 from pathlib import Path
 
-def log_action(action_name, inputs, outputs, script_path=None, query=None):
+def log_action(action_name, inputs, outputs, script_path=None, query=None, status="Success"):
     """
     Logs an action to the provenance graph in data/graph/provenance.jsonld.
     
@@ -13,6 +13,7 @@ def log_action(action_name, inputs, outputs, script_path=None, query=None):
         outputs (list): List of output entities (e.g. file objects with UNFs)
         script_path (str): Path to the script that performed the action
         query (str): The user query that triggered the action
+        status (str): Status of the action ('Success' or 'Failed')
     """
     graph_dir = "data/graph"
     os.makedirs(graph_dir, exist_ok=True)
@@ -95,6 +96,7 @@ def log_action(action_name, inputs, outputs, script_path=None, query=None):
         "@id": activity_id,
         "@type": "prov:Activity",
         "sc:name": action_name,
+        "sc:actionStatus": f"sc:{status}ActionStatus",
         "prov:startedAtTime": datetime.datetime.now().isoformat(),
         "prov:used": prov_inputs,
         "prov:generated": prov_outputs,

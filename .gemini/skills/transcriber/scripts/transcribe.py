@@ -15,6 +15,22 @@ def get_video_id(url_or_id):
         return url_or_id
     return None
 
+def log_failure(action_name, video_id, url, query, reason):
+    try:
+        from pathlib import Path
+        import importlib.util
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        skills_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_dir)))
+        log_script = os.path.join(skills_dir, "unf", "scripts", "log_provenance.py")
+        if os.path.exists(log_script):
+            spec = importlib.util.spec_from_file_location("log_provenance", log_script)
+            log_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(log_module)
+            inputs = [{"@type": "sc:URL", "url": url, "name": video_id}]
+            log_module.log_action(action_name, inputs, [], script_path=os.path.abspath(__file__), query=query, status="Failed")
+    except Exception:
+        pass
+
 def transcribe_video(video_id, output_dir, target_url, cookies_path=None, query=None):
     from requests import Session
     import http.cookiejar
@@ -138,17 +154,19 @@ def transcribe_video(video_id, output_dir, target_url, cookies_path=None, query=
                                     {"@type": "FileObject", "name": f"{video_id}.json", "unf": metadata.get("unf")},
                                     {"@type": "FileObject", "name": f"{video_id}-croissant.json", "unf": croissant_data.get("sc:identifier")}
                                 ]
-                                log_module.log_action("transcribe_and_serialize", inputs, outputs, script_path=script_path_abs, query=query)
+                                log_module.log_action("transcribe_and_serialize", inputs, outputs, script_path=script_path_abs, query=query, status="Completed")
                         except Exception as log_err:
                             print(f"Warning: Provenance logging failed: {log_err}")
                 except Exception as croissant_err:
                     print(f"Warning: Croissant serialization failed: {croissant_err}")
+                    log_failure("transcribe_and_serialize", video_id, target_url, query, str(croissant_err))
         except ImportError:
             pass
             
         return True
     except Exception as e:
         print(f"Error transcribing {video_id}: {e}")
+        log_failure("transcribe_and_serialize", video_id, target_url, query, str(e))
         return False
 
 def main():
